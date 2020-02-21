@@ -56,6 +56,8 @@ function configureUploadCommand(program) {
       const { config: configPath } = command;
       loadConfig(configPath);
 
+      console.log('Done loading config');
+
       if (
         !(
           validateConfig() &&
@@ -66,9 +68,13 @@ function configureUploadCommand(program) {
         process.exit(1);
       }
 
+      console.log('Done validation');
+
       const portalId = getPortalId(command);
       const mode = getMode(command);
       const absoluteSrcPath = path.resolve(getCwd(), src);
+
+      console.log('About to try upload');
 
       let stats;
       try {

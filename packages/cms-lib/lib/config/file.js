@@ -11,6 +11,7 @@ const {
   DEFAULT_HUBSPOT_CONFIG_YAML_FILE_NAME,
   EMPTY_CONFIG_FILE_CONTENTS,
 } = require('../constants');
+const { getEnvironmentVariableConfig } = require('./environmentVariables');
 
 let _config;
 let _configPath;
@@ -98,6 +99,11 @@ const parseConfig = configSource => {
 };
 
 const loadConfig = (path, options = {}) => {
+  const environmentVariablesConfig = getEnvironmentVariableConfig();
+  if (environmentVariablesConfig) {
+    setConfig(Object.freeze(environmentVariablesConfig));
+    return getConfig();
+  }
   _configPath = getConfigPath(path);
   if (!_configPath) {
     if (!options.silenceErrors) {
@@ -122,6 +128,8 @@ const loadConfig = (path, options = {}) => {
       portals: [],
     });
   }
+
+  return getConfig();
 };
 
 const getAndLoadConfigIfNeeded = () => {
