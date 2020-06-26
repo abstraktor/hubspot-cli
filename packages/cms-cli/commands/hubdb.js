@@ -11,6 +11,7 @@ const {
   createHubDbTable,
   downloadHubDbTable,
   clearHubDbTableRows,
+  updateHubDbTable,
 } = require('@hubspot/cms-lib/hubdb');
 const { publishTable, deleteTable } = require('@hubspot/cms-lib/api/hubdb');
 
@@ -33,6 +34,7 @@ function configureHubDbCommand(program) {
     .description('Manage HubDB tables')
     .command('create <src>', 'create a HubDB table')
     .command('fetch <tableId> <dest>', 'fetch a HubDB table')
+    .command('upload   <tableId> <src>', 'upload a HubDB table')
     .command('clear <tableId>', 'clear all rows in a HubDB table')
     .command('delete <tableId>', 'delete a HubDB table');
 
@@ -96,6 +98,42 @@ function configureHubDbFetchCommand(program) {
         const { filePath } = await downloadHubDbTable(portalId, tableId, dest);
 
         logger.log(`Downloaded HubDB table ${tableId} to ${filePath}`);
+      } catch (e) {
+        logErrorInstance(e);
+      }
+    });
+
+  addLoggerOptions(program);
+  addPortalOptions(program);
+  addConfigOptions(program);
+}
+
+function configureHubDbUploadCommand(program) {
+  program
+    .version(version)
+    .description('Upload a HubDB table')
+    .arguments('<tableId> [src]')
+    .action(async (tableId, src, command = {}) => {
+      setLogLevel(command);
+      logDebugInfo(command);
+      const { config: configPath } = command;
+      loadConfig(configPath);
+      checkAndWarnGitInclusion();
+
+      if (!(validateConfig() && (await validatePortal(command)))) {
+        process.exit(1);
+      }
+      const portalId = getPortalId(command);
+      try {
+        const { updateCount, createCount } = await updateHubDbTable(
+          portalId,
+          tableId,
+          src
+        );
+
+        logger.log(
+          `Uploaded HubDB table ${tableId} from ${src}, updating ${updateCount} rows, creating ${createCount} rows`
+        );
       } catch (e) {
         logErrorInstance(e);
       }
@@ -178,6 +216,7 @@ function configureHubDbDeleteCommand(program) {
 module.exports = {
   configureHubDbCommand,
   configureHubDbCreateCommand,
+  configureHubDbUploadCommand,
   configureHubDbFetchCommand,
   configureHubDbClearCommand,
   configureHubDbDeleteCommand,

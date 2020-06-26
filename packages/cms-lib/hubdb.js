@@ -6,6 +6,7 @@ const {
   createTable,
   updateTable,
   createRows,
+  updateRows,
   fetchTable,
   fetchRows,
   publishTable,
@@ -32,8 +33,8 @@ function validateJsonFile(src) {
   validateJsonPath(src);
 }
 
-async function addRowsToHubDbTable(portalId, tableId, rows, columns) {
-  const rowsToUpdate = rows.map(row => {
+function withResolvedColumnNames(rows, columns) {
+  return rows.map(row => {
     const values = {};
 
     columns.forEach(col => {
@@ -52,8 +53,11 @@ async function addRowsToHubDbTable(portalId, tableId, rows, columns) {
       values,
     };
   });
+}
 
+async function addRowsToHubDbTable(portalId, tableId, rows, columns) {
   let response;
+  const rowsToUpdate = withResolvedColumnNames(rows, columns);
   if (rowsToUpdate.length > 0) {
     response = await createRows(portalId, tableId, rowsToUpdate);
   }
@@ -65,6 +69,51 @@ async function addRowsToHubDbTable(portalId, tableId, rows, columns) {
     rowCount:
       response && Array.isArray(response) && response.length
         ? response[0].rows.length
+        : 0,
+  };
+}
+
+async function updateRowsOfHubDbTable(portalId, tableId, rows, columns) {
+  // resolve column ids with parameter and row ids by fetching rows and comparing the path
+  const existingRows = await fetchRows(
+    portalId,
+    tableId /* todo: deal with paging, { offset }*/
+  );
+  const rowIdsByPath = existingRows.objects.reduce(
+    (acc, row) => ((acc[row.path] = row.id), acc),
+    {}
+  );
+  const resolvedRows = withResolvedColumnNames(rows, columns).map(row => ({
+    id: rowIdsByPath[row.path],
+    ...row,
+  }));
+
+  // update
+  let updateResponse;
+  const rowsToUpdate = resolvedRows.filter(row => row.id);
+  if (rowsToUpdate.length > 0) {
+    updateResponse = await updateRows(portalId, tableId, rowsToUpdate);
+  }
+
+  // create
+  let createResponse;
+  const rowsToCreate = resolvedRows.filter(row => !row.id);
+  if (rowsToCreate.length > 0) {
+    createResponse = await createRows(portalId, tableId, rowsToCreate);
+  }
+
+  // publish
+  await publishTable(portalId, tableId);
+
+  return {
+    tableId,
+    updateCount:
+      updateResponse && Array.isArray(updateResponse) && updateResponse.length
+        ? updateResponse[0].rows.length
+        : 0,
+    createCount:
+      createResponse && Array.isArray(createResponse) && createResponse.length
+        ? createResponse[0].rows.length
         : 0,
   };
 }
@@ -83,9 +132,11 @@ async function updateHubDbTable(portalId, tableId, src) {
   validateJsonFile(src);
 
   const table = fs.readJsonSync(src);
-  const { ...schema } = table;
+  const { rows, ...schema } = table;
 
-  return updateTable(portalId, tableId, schema);
+  return updateTable(portalId, tableId, schema).then(({ columns }) => {
+    return updateRowsOfHubDbTable(portalId, tableId, rows, columns);
+  });
 }
 
 function convertToJSON(table, rows) {
@@ -206,4 +257,5 @@ module.exports = {
   clearHubDbTableRows,
   updateHubDbTable,
   addRowsToHubDbTable,
+  updateRowsOfHubDbTable,
 };
