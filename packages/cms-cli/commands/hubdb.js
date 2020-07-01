@@ -125,14 +125,14 @@ function configureHubDbUploadCommand(program) {
       }
       const portalId = getPortalId(command);
       try {
-        const { updateCount, createCount } = await updateHubDbTable(
-          portalId,
-          tableId,
-          src
-        );
+        const {
+          updateCount,
+          createCount,
+          deleteCount,
+        } = await updateHubDbTable(portalId, tableId, src);
 
         logger.log(
-          `Uploaded HubDB table ${tableId} from ${src}, updating ${updateCount} rows, creating ${createCount} rows`
+          `Uploaded and published HubDB table ${tableId} from ${src}, updating ${updateCount} rows, creating ${createCount} rows, deleting ${deleteCount} rows`
         );
       } catch (e) {
         logErrorInstance(e);

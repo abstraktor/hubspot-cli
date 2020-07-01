@@ -75,18 +75,22 @@ async function addRowsToHubDbTable(portalId, tableId, rows, columns) {
 
 async function updateRowsOfHubDbTable(portalId, tableId, rows, columns) {
   // resolve column ids with parameter and row ids by fetching rows and comparing the path
-  const existingRows = await fetchRows(
-    portalId,
-    tableId /* todo: deal with paging, { offset }*/
-  );
-  const rowIdsByPath = existingRows.objects.reduce(
+  const existingRows = (
+    await fetchRows(portalId, tableId /* todo: deal with paging, { offset }*/)
+  ).objects;
+  const rowIdsByPath = existingRows.reduce(
     (acc, row) => ((acc[row.path] = row.id), acc),
     {}
   );
-  const resolvedRows = withResolvedColumnNames(rows, columns).map(row => ({
-    id: rowIdsByPath[row.path],
-    ...row,
-  }));
+  const resolvedRows = withResolvedColumnNames(rows, columns).map(row => {
+    const pathWithoutTrailingSlash = row.path.endsWith('/')
+      ? row.path.slice(0, -1)
+      : row.path;
+    return {
+      id: rowIdsByPath[pathWithoutTrailingSlash],
+      ...row,
+    };
+  });
 
   // update
   let updateResponse;
@@ -102,19 +106,42 @@ async function updateRowsOfHubDbTable(portalId, tableId, rows, columns) {
     createResponse = await createRows(portalId, tableId, rowsToCreate);
   }
 
+  // delete
+  let deleteResponse;
+  const rowsToDelete = existingRows.filter(
+    row => !resolvedRows.some(resolvedRow => resolvedRow.id == row.id)
+  );
+  if (rowsToDelete.length > 0) {
+    deleteResponse = await deleteRows(
+      portalId,
+      tableId,
+      rowsToDelete.map(row => row.id)
+    );
+  }
+
   // publish
   await publishTable(portalId, tableId);
 
+  const extractCountFromResponse = function(response, accessor) {
+    return response && Array.isArray(response) && response.length
+      ? accessor(response[0])
+      : 0;
+  };
+
   return {
     tableId,
-    updateCount:
-      updateResponse && Array.isArray(updateResponse) && updateResponse.length
-        ? updateResponse[0].rows.length
-        : 0,
-    createCount:
-      createResponse && Array.isArray(createResponse) && createResponse.length
-        ? createResponse[0].rows.length
-        : 0,
+    updateCount: extractCountFromResponse(
+      updateResponse,
+      respData => respData.rows.length
+    ),
+    createCount: extractCountFromResponse(
+      createResponse,
+      respData => respData.rows.length
+    ),
+    deleteCount: extractCountFromResponse(
+      deleteResponse,
+      respData => respData.rowIds.length
+    ),
   };
 }
 
