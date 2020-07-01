@@ -144,6 +144,36 @@ function configureHubDbUploadCommand(program) {
   addConfigOptions(program);
 }
 
+function configureHubDbPublishCommand(program) {
+  program
+    .version(version)
+    .description('Publish a HubDB table')
+    .arguments('<tableId>')
+    .action(async (tableId, src, command = {}) => {
+      setLogLevel(command);
+      logDebugInfo(command);
+      const { config: configPath } = command;
+      loadConfig(configPath);
+      checkAndWarnGitInclusion();
+
+      if (!(validateConfig() && (await validatePortal(command)))) {
+        process.exit(1);
+      }
+      const portalId = getPortalId(command);
+      try {
+        await publishTable(portalId, tableId);
+
+        logger.log(`Publishing HubDB table ${tableId}`);
+      } catch (e) {
+        logErrorInstance(e);
+      }
+    });
+
+  addLoggerOptions(program);
+  addPortalOptions(program);
+  addConfigOptions(program);
+}
+
 function configureHubDbClearCommand(program) {
   program
     .version(version)
@@ -220,4 +250,5 @@ module.exports = {
   configureHubDbFetchCommand,
   configureHubDbClearCommand,
   configureHubDbDeleteCommand,
+  configureHubDbPublishCommand,
 };
