@@ -119,9 +119,6 @@ async function updateRowsOfHubDbTable(portalId, tableId, rows, columns) {
     );
   }
 
-  // publish
-  await publishTable(portalId, tableId);
-
   const extractCountFromResponse = function(response, accessor) {
     return response && Array.isArray(response) && response.length
       ? accessor(response[0])
