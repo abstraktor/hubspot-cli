@@ -129,14 +129,11 @@ function configureHubDbUploadCommand(program) {
           updateCount,
           createCount,
           deleteCount,
-          ...rest
         } = await updateHubDbTable(portalId, tableId, src);
 
         logger.log(
           `Uploaded HubDB table ${tableId} from ${src}, updating ${updateCount} rows, creating ${createCount} rows, deleting ${deleteCount} rows`
         );
-
-        logger.log('Rest:', rest);
       } catch (e) {
         logErrorInstance(e);
       }
