@@ -35,6 +35,7 @@ function configureHubDbCommand(program) {
     .command('create <src>', 'create a HubDB table')
     .command('fetch <tableId> <dest>', 'fetch a HubDB table')
     .command('upload   <tableId> <src>', 'upload a HubDB table')
+    .command('publish  <tableId>', 'publish a HubDB table')
     .command('clear <tableId>', 'clear all rows in a HubDB table')
     .command('delete <tableId>', 'delete a HubDB table');
 
@@ -149,7 +150,7 @@ function configureHubDbPublishCommand(program) {
     .version(version)
     .description('Publish a HubDB table')
     .arguments('<tableId>')
-    .action(async (tableId, src, command = {}) => {
+    .action(async (tableId, command = {}) => {
       setLogLevel(command);
       logDebugInfo(command);
       const { config: configPath } = command;
