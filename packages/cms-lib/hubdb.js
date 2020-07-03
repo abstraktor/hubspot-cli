@@ -125,20 +125,32 @@ async function updateRowsOfHubDbTable(portalId, tableId, rows, columns) {
       : 0;
   };
 
+  const extractErrorsFromResponse = function(response) {
+    return response && Array.isArray(response) ? response.slice(1) : [];
+  };
+
   return {
     tableId,
     updateCount: extractCountFromResponse(
       updateResponse,
       respData => respData.rows.length
     ),
+    plannedUpdates: rowsToUpdate.length,
+
     createCount: extractCountFromResponse(
       createResponse,
       respData => respData.rows.length
     ),
+    plannedCreations: rowsToCreate.length,
     deleteCount: extractCountFromResponse(
       deleteResponse,
       respData => respData.rowIds.length
     ),
+    plannedDeletions: rowsToDelete.length,
+
+    errors: extractErrorsFromResponse(updateResponse)
+      .concat(extractErrorsFromResponse(createResponse))
+      .concat(extractErrorsFromResponse(deleteResponse)),
   };
 }
 
