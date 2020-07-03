@@ -137,7 +137,7 @@ function configureHubDbUploadCommand(program) {
         logger.log(
           `Uploaded HubDB table ${tableId} from ${src}, updating ${updateCount} rows, creating ${createCount} rows, deleting ${deleteCount} rows`
         );
-        if (errors) {
+        if (errors && errors.length) {
           logger.error('Something went wrong: ', errors, rest);
           process.exit(1);
         }
