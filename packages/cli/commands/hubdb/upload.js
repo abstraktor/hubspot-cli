@@ -19,7 +19,7 @@ const {
   } = require('../../lib/commonOpts');
   const { logDebugInfo } = require('../../lib/debugInfo');
   
-  exports.command = 'upload <tableId> [src]';
+  exports.command = 'upload <tableId> <src>';
   exports.describe = 'Upload a HubDB table';
   
   exports.handler = async options => {
