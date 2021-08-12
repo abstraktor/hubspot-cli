@@ -33,32 +33,9 @@ function validateJsonFile(src) {
   validateJsonPath(src);
 }
 
-function withResolvedColumnNames(rows, columns) {
-  return rows.map(row => {
-    const values = {};
-
-    columns.forEach(col => {
-      const { name, id } = col;
-      if (typeof row.values[name] !== 'undefined') {
-        values[id] = row.values[name];
-      } else {
-        values[id] = null;
-      }
-    });
-
-    return {
-      childTableId: 0,
-      isSoftEditable: false,
-      ...row,
-      values,
-    };
-  });
-}
-
-async function addRowsToHubDbTable(accountId, tableId, rows, columns) {
-  const rowsToUpdate = withResolvedColumnNames(rows, columns);
-  if (rowsToUpdate.length > 0) {
-    await createRows(accountId, tableId, rowsToUpdate);
+async function addRowsToHubDbTable(accountId, tableId, rows) {
+  if (rows.length > 0) {
+    await createRows(accountId, tableId, rows);
   }
 
   const { rowCount } = await publishTable(accountId, tableId);
@@ -69,21 +46,21 @@ async function addRowsToHubDbTable(accountId, tableId, rows, columns) {
   };
 }
 
-async function updateRowsOfHubDbTable(accountId, tableId, rows, columns) {
+async function updateRowsOfHubDbTable(accountId, tableId, rows) {
   // resolve column ids with parameter and row ids by fetching rows and comparing the path
   const existingRows = (
     await fetchRows(accountId, tableId /* todo: deal with paging, { offset }*/)
-  ).objects;
+  ).results;
   const rowIdsByPath = existingRows.reduce(
     (acc, row) => ((acc[row.path] = row.id), acc),
     {}
   );
-  const resolvedRows = withResolvedColumnNames(rows, columns).map(row => {
+  const resolvedRows = rows.map(row => {
     const pathWithoutTrailingSlash = row.path.endsWith('/')
       ? row.path.slice(0, -1)
       : row.path;
     return {
-      id: rowIdsByPath[pathWithoutTrailingSlash],
+      id: rowIdsByPath[pathWithoutTrailingSlash.toLowerCase()],
       ...row,
     };
   });
@@ -92,7 +69,9 @@ async function updateRowsOfHubDbTable(accountId, tableId, rows, columns) {
   let updateResponse;
   const rowsToUpdate = resolvedRows.filter(row => row.id);
   if (rowsToUpdate.length > 0) {
-    updateResponse = await updateRows(accountId, tableId, rowsToUpdate);
+    updateResponse = await updateRows(accountId, tableId, {
+      inputs: rowsToUpdate,
+    });
   }
 
   // create
@@ -116,8 +95,8 @@ async function updateRowsOfHubDbTable(accountId, tableId, rows, columns) {
   }
 
   const extractCountFromResponse = function(response, accessor) {
-    return response && Array.isArray(response) && response.length
-      ? accessor(response[0])
+    return response && Array.isArray(accessor(response))
+      ? accessor(response).length
       : 0;
   };
 
@@ -127,21 +106,12 @@ async function updateRowsOfHubDbTable(accountId, tableId, rows, columns) {
 
   return {
     tableId,
-    updateCount: extractCountFromResponse(
-      updateResponse,
-      respData => respData.rows.length
-    ),
+    updateCount: extractCountFromResponse(updateResponse, it => it.results),
     plannedUpdates: rowsToUpdate.length,
 
-    createCount: extractCountFromResponse(
-      createResponse,
-      respData => respData.rows.length
-    ),
+    createCount: extractCountFromResponse(createResponse, it => it.results),
     plannedCreations: rowsToCreate.length,
-    deleteCount: extractCountFromResponse(
-      deleteResponse,
-      respData => respData.rowIds.length
-    ),
+    deleteCount: extractCountFromResponse(deleteResponse, it => it.rowIds),
     plannedDeletions: rowsToDelete.length,
 
     errors: extractErrorsFromResponse(updateResponse)
@@ -155,9 +125,9 @@ async function createHubDbTable(accountId, src) {
 
   const table = fs.readJsonSync(src);
   const { rows, ...schema } = table;
-  const { columns, id } = await createTable(accountId, schema);
+  const { id } = await createTable(accountId, schema);
 
-  return addRowsToHubDbTable(accountId, id, rows, columns);
+  return addRowsToHubDbTable(accountId, id, rows);
 }
 
 async function updateHubDbTable(accountId, tableId, src) {
@@ -166,8 +136,8 @@ async function updateHubDbTable(accountId, tableId, src) {
   const table = fs.readJsonSync(src);
   const { rows, ...schema } = table;
 
-  return updateTable(accountId, tableId, schema).then(({ columns }) => {
-    return updateRowsOfHubDbTable(accountId, tableId, rows, columns);
+  return updateTable(accountId, tableId, schema).then(() => {
+    return updateRowsOfHubDbTable(accountId, tableId, rows);
   });
 }
 
